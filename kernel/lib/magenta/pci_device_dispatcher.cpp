@@ -81,6 +81,9 @@ status_t PciDeviceDispatcher::ClaimDevice() {
     if (result != NO_ERROR)
         return result;
 
+    // XXX hack
+    device_->device()->EnablePio(true);
+
     return NO_ERROR;
 }
 
