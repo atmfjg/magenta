@@ -2,6 +2,7 @@
 #include "libc.h"
 #include <errno.h>
 #include <magenta/syscalls.h>
+#include <magenta/syscalls/object.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <string.h>
@@ -27,7 +28,23 @@ static mx_status_t vmo_remap(uintptr_t old_mapping, mx_size_t old_len, mx_size_t
         return status;
     }
 
-    status = _mx_process_map_vm(_mx_process_self(), vmo, 0u, new_len, new_mapping, flags);
+    size_t offset = 0;
+    if (flags & MX_VM_FLAG_SPECIFIC) {
+        mx_info_vmar_t info;
+        mx_status_t status = mx_object_get_info(_mx_vmar_root_self(),
+                                                MX_INFO_VMAR, &info,
+                                                sizeof(info), NULL, NULL);
+        if (status < 0) {
+            return status;
+        }
+        if (*new_mapping < info.base) {
+            return ERR_INVALID_ARGS;
+        }
+        offset = *new_mapping - info.base;
+    }
+
+    status = _mx_vmar_map(_mx_vmar_root_self(), offset, vmo, 0u, new_len,
+                          flags, new_mapping);
     _mx_handle_close(vmo);
     if (status != NO_ERROR) {
         return status;
@@ -35,9 +52,9 @@ static mx_status_t vmo_remap(uintptr_t old_mapping, mx_size_t old_len, mx_size_t
 
     memcpy((void*)*new_mapping, (void*)old_mapping, old_len);
 
-    status = _mx_process_unmap_vm(_mx_process_self(), old_mapping, 0u);
+    status = _mx_vmar_unmap(_mx_vmar_root_self(), old_mapping, old_len);
     if (status != NO_ERROR) {
-        _mx_process_unmap_vm(_mx_process_self(), *new_mapping, 0u);
+        _mx_vmar_unmap(_mx_vmar_root_self(), *new_mapping, new_len);
         return status;
     }
 
@@ -88,7 +105,7 @@ void* __fake_mremap(void* old_addr, size_t old_len, size_t new_len, int flags, .
     // TODO(kulakowski) Right now, the only caller of this is
     // realloc. So give the mapping RW permissions.
     uint32_t mx_flags = MX_VM_FLAG_PERM_READ | MX_VM_FLAG_PERM_WRITE;
-    mx_flags |= (flags & MREMAP_FIXED) ? MX_VM_FLAG_FIXED : 0;
+    mx_flags |= (flags & MREMAP_FIXED) ? MX_VM_FLAG_SPECIFIC : 0;
 
     uintptr_t new_mapping = 0u;
     mx_status_t status = vmo_remap(mapping, old_len, new_len, mx_flags, &new_mapping);
