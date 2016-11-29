@@ -17,8 +17,9 @@
 
 class Dispatcher;
 class Handle;
-class VmObject;
 class VmAspace;
+class VmMapping;
+class VmObject;
 
 struct PipeConsumer;
 struct PipeProducer;
@@ -66,9 +67,9 @@ private:
         bool alive = true;
         bool read_only = false;
         mx_size_t cursor = 0u;
-        char* vad_start = 0u;
         mx_size_t expected = 0u;
         mxtl::RefPtr<VmAspace> aspace;
+        mxtl::RefPtr<VmMapping> mapping;
         StateTracker state_tracker;
     };
 

@@ -90,17 +90,29 @@ mx_status_t DataPipe::MapVMOIfNeededNoLock(EndPoint* ep, mxtl::RefPtr<VmAspace> 
     if (ep->aspace && (ep->aspace != aspace)) {
         // We have been transfered to another process. Unmap and free.
         // TODO(cpu): Do this at a better time.
-        ep->aspace->FreeRegion(reinterpret_cast<vaddr_t>(ep->vad_start));
+        if (ep->mapping) {
+            ep->mapping->Unmap();
+            ep->mapping.reset();
+        }
         ep->aspace.reset();
     }
 
-    // For large requests we can use demand page here instead of commit.
+    mxtl::RefPtr<VmMapping> mapping;
     auto perms = ep->read_only ? kDP_Map_Perms_RO : kDP_Map_Perms;
-    auto status = aspace->MapObject(vmo_, "datapipe", 0u, capacity_,
-                                    reinterpret_cast<void**>(&ep->vad_start), 0, 0,
-                                    VMM_FLAG_COMMIT, perms);
+    size_t size = ROUNDUP(capacity_, PAGE_SIZE);
+    status_t status = aspace->root_vmar()->CreateVmMapping(0, size, 0, 0,
+                                                           vmo_, 0, perms, "datapipe",
+                                                           &ep->mapping);
     if (status < 0)
         return status;
+
+    // Commit all of the pages up to our capacity
+    status = ep->mapping->MapRange(0, size, true);
+    if (status < 0) {
+        ep->mapping->Unmap();
+        ep->mapping.reset();
+        return status;
+    }
 
     ep->aspace = mxtl::move(aspace);
     return NO_ERROR;
@@ -239,7 +251,7 @@ mx_ssize_t DataPipe::ProducerWriteBegin(mxtl::RefPtr<VmAspace> aspace, void** pt
 
     UpdateProducerSignalsNoLock();
 
-    *ptr = producer_.vad_start + producer_.cursor;
+    *ptr = reinterpret_cast<void*>(producer_.mapping->base() + producer_.cursor);
     return static_cast<mx_ssize_t>(producer_.expected);
 }
 
@@ -383,7 +395,7 @@ mx_ssize_t DataPipe::ConsumerReadBegin(mxtl::RefPtr<VmAspace> aspace, void** ptr
 
     UpdateConsumerSignalsNoLock();
 
-    *ptr = consumer_.vad_start + consumer_.cursor;
+    *ptr = reinterpret_cast<void*>(consumer_.mapping->base() + consumer_.cursor);
     return static_cast<mx_ssize_t>(consumer_.expected);
 }
 
@@ -433,7 +445,10 @@ void DataPipe::OnProducerDestruction() {
     producer_.alive = false;
 
     if (producer_.aspace) {
-        producer_.aspace->FreeRegion(reinterpret_cast<vaddr_t>(producer_.vad_start));
+        if (producer_.mapping) {
+            producer_.mapping->Unmap();
+            producer_.mapping.reset();
+        }
         producer_.aspace.reset();
     }
 
@@ -453,7 +468,10 @@ void DataPipe::OnConsumerDestruction() {
     vmo_.reset();
 
     if (consumer_.aspace) {
-        consumer_.aspace->FreeRegion(reinterpret_cast<vaddr_t>(consumer_.vad_start));
+        if (consumer_.mapping) {
+            consumer_.mapping->Unmap();
+            consumer_.mapping.reset();
+        }
         consumer_.aspace.reset();
     }
 
