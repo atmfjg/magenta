@@ -91,7 +91,7 @@ mx_status_t DataPipe::MapVMOIfNeededNoLock(EndPoint* ep, mxtl::RefPtr<VmAspace> 
         // We have been transfered to another process. Unmap and free.
         // TODO(cpu): Do this at a better time.
         if (ep->mapping) {
-            ep->mapping->Unmap();
+            ep->mapping->Destroy();
             ep->mapping.reset();
         }
         ep->aspace.reset();
@@ -109,7 +109,7 @@ mx_status_t DataPipe::MapVMOIfNeededNoLock(EndPoint* ep, mxtl::RefPtr<VmAspace> 
     // Commit all of the pages up to our capacity
     status = ep->mapping->MapRange(0, size, true);
     if (status < 0) {
-        ep->mapping->Unmap();
+        ep->mapping->Destroy();
         ep->mapping.reset();
         return status;
     }
@@ -446,7 +446,7 @@ void DataPipe::OnProducerDestruction() {
 
     if (producer_.aspace) {
         if (producer_.mapping) {
-            producer_.mapping->Unmap();
+            producer_.mapping->Destroy();
             producer_.mapping.reset();
         }
         producer_.aspace.reset();
@@ -469,7 +469,7 @@ void DataPipe::OnConsumerDestruction() {
 
     if (consumer_.aspace) {
         if (consumer_.mapping) {
-            consumer_.mapping->Unmap();
+            consumer_.mapping->Destroy();
             consumer_.mapping.reset();
         }
         consumer_.aspace.reset();

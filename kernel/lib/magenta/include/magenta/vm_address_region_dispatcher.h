@@ -36,9 +36,9 @@ public:
                     mxtl::RefPtr<VmObject> vmo, uint64_t vmo_offset, size_t len,
                     uint32_t vmar_flags, uint arch_mmu_flags, mxtl::RefPtr<VmMapping>* out);
 
-    mx_status_t Protect(size_t offset, size_t len, uint arch_mmu_flags);
+    mx_status_t Protect(vaddr_t base, size_t len, uint arch_mmu_flags);
 
-    mx_status_t Unmap(size_t offset, size_t len);
+    mx_status_t Unmap(vaddr_t base, size_t len);
 
     mxtl::RefPtr<VmAddressRegion> vmar() const { return vmar_; }
 

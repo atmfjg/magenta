@@ -282,11 +282,7 @@ mx_status_t sys_vmar_unmap(mx_handle_t vmar_handle, uintptr_t addr, mx_size_t le
     if (status != NO_ERROR)
         return status;
 
-    if (addr < vmar->vmar()->base())
-        return ERR_INVALID_ARGS;
-
-    size_t offset = addr - vmar->vmar()->base();
-    return vmar->Unmap(offset, len);
+    return vmar->Unmap(addr, len);
 }
 
 mx_status_t sys_vmar_protect(mx_handle_t vmar_handle, uintptr_t addr, mx_size_t len, uint32_t prot) {
@@ -319,9 +315,5 @@ mx_status_t sys_vmar_protect(mx_handle_t vmar_handle, uintptr_t addr, mx_size_t 
     if (vmar_flags)
         return ERR_INVALID_ARGS;
 
-    if (addr < vmar->vmar()->base())
-        return ERR_INVALID_ARGS;
-
-    size_t offset = addr - vmar->vmar()->base();
-    return vmar->Protect(offset, len, arch_mmu_flags);
+    return vmar->Protect(addr, len, arch_mmu_flags);
 }
