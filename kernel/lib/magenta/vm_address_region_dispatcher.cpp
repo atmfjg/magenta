@@ -120,19 +120,23 @@ mx_status_t VmAddressRegionDispatcher::Unmap(vaddr_t base, size_t len) {
         return ERR_INVALID_ARGS;
     }
 
-    // TODO(teisenbe): This should actually allow spanning multiple regions.
-    mxtl::RefPtr<VmMapping> mapping(nullptr);
-    {
-        mxtl::RefPtr<VmAddressRegionOrMapping> child = vmar_->FindRegion(base);
-        if (!child) {
+    // TODO(tesienbe): Remove this when we no longer support len=0 compat
+    if (len == 0) {
+        mxtl::RefPtr<VmMapping> mapping(nullptr);
+        {
+            mxtl::RefPtr<VmAddressRegionOrMapping> child = vmar_->FindRegion(base);
+            if (!child) {
+                return ERR_NOT_FOUND;
+            }
+            mapping = child->as_vm_mapping();
+        }
+
+        if (!mapping) {
             return ERR_NOT_FOUND;
         }
-        mapping = child->as_vm_mapping();
+
+        return mapping->Unmap(base, len);
     }
 
-    if (!mapping) {
-        return ERR_NOT_FOUND;
-    }
-
-    return mapping->Unmap(base, len);
+    return vmar_->Unmap(base, len);
 }
