@@ -27,7 +27,7 @@ closing the VMO handle does not remove the mapping added by this function.
 - **MX_VM_FLAG_SPECIFIC_OVERWRITE**  Same as **MX_VM_FLAG_SPECIFIC**, but can
   overlap another mapping.  It is still an error to overlap another VMAR.  If
   the range meets these requirements, it will atomically (with respect to all
-  other map/unmap operations) replace existing mappings in the area.
+  other map/unmap/protect operations) replace existing mappings in the area.
 - **MX_VM_FLAG_PERM_READ**  Map *vmo* as readable.  It is an error if *vmar*
   does not have *MX_VM_FLAG_CAN_MAP_READ* permissions, the *vmar* handle does
   not have the *MX_RIGHT_READ* right, or the *vmo* handle does not have the
@@ -53,10 +53,14 @@ returned.
 
 **ERR_BAD_STATE**  *parent_vmar_handle* refers to a destroyed VMAR
 
-**ERR_INVALID_ARG** *mapped_addr* or *map_flags* are not valid, *vmar_offset* is
-non-zero when *MX_VM_FLAG_SPECIFIC* is not given, *vmar_offset* and *len*
-describe an unsatisfiable allocation due to exceeding the region bounds,
-*vmar_offset* is not page-aligned, or *len* is 0.
+**ERR_INVALID_ARG** *mapped_addr* or *map_flags* are not valid,
+*vmar_offset* is non-zero when *MX_VM_FLAG_SPECIFIC* or
+*MX_VM_FLAG_SPECIFIC_OVERWRITE* is not given,
+*vmar_offset* and *len* describe an unsatisfiable allocation due
+to exceeding the region bounds,
+*vmar_offset* is not page-aligned,
+*MX_VM_FLAG_SPECIFIC_OVERWRITE* given and range overlaps a subregion,
+or *len* is 0.
 
 **ERR_ACCESS_DENIED**  insufficient privileges to make the requested mapping
 
@@ -67,8 +71,6 @@ describe an unsatisfiable allocation due to exceeding the region bounds,
 A virtual memory object can be larger than the address space, which means you
 should check for overflow before converting the **uint64_t** size of the VMO to
 **vmar_map**'s **mx_size_t** *len* parameter.
-
-**MX_VM_FLAG_SPECIFIC_OVERWRITE** is not implemented.
 
 ## SEE ALSO
 
